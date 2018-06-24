@@ -347,33 +347,6 @@ if(LIBBPG_X265)
                        VERBATIM
                        COMMAND_EXPAND_LISTS)
     add_custom_target(libx265_8bit ALL DEPENDS ${x265_8bit})
-
-    #set(HIGH_BIT_DEPTH OFF CACHE BOOL "enable high bit-depth")
-    #set(EXPORT_C_API OFF CACHE BOOL "enable exporting C API")
-    #set(ENABLE_CLI OFF CACHE BOOL "enable CLI application" FORCE)
-    #set(ENABLE_SHARED OFF CACHE BOOL "enable shared library")
-    #add_subdirectory(x265/source x265.build/8bit EXCLUDE_FROM_ALL)
-    #get_property(target DIRECTORY x265/source PROPERTY BUILDSYSTEM_TARGETS)
-    #set_target_properties(${target} PROPERTIES ARCHIVE_OUTPUT_NAME x265_8bit)
-
-    #set_property(DIRECTORY x265/source_10bit APPEND PROPERTY COMPILE_DEFINITIONS
-    #             HIGH_BITDEPTH=ON
-    #             EXPORT_C_API=OFF
-    #             ENABLE_SHARED=OFF
-    #             ENABLE_CLI=OFF
-    #             MAIN10=ON)
-    #add_subdirectory(x265/source_10bit x265.build/10bit EXCLUDE_FROM_ALL)
-    #get_property(target DIRECTORY x265/source_10bit PROPERTY BUILDSYSTEM_TARGETS)
-    #set_target_properties(${target} PROPERTIES ARCHIVE_OUTPUT_NAME x265_10bit)
-
-    #set_property(DIRECTORY x265/source APPEND PROPERTY COMPILE_DEFINITIONS
-    #             HIGH_BITDEPTH=ON
-    #             EXPORT_C_API=OFF
-    #             ENABLE_SHARED=OFF
-    #             ENABLE_CLI=OFF
-    #             MAIN12=ON)
-    #set_property(DIRECTORY x265/source PROPERTY ARCHIVE_OUTPUT_NAME x265_12bit)
-    #add_subdirectory(x265/source x265.build/12bit EXCLUDE_FROM_ALL)
 endif()
 
 if(LIBBPG_JCTVC)
