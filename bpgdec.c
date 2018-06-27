@@ -29,6 +29,11 @@
 #include <getopt.h>
 #include <inttypes.h>
 
+#ifdef _MSC_VER
+#define strcasecmp _stricmp
+#define strncasecmp _strnicmp
+#endif
+
 /* define it to include PNG output */
 #define USE_PNG
 

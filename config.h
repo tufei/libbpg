@@ -151,9 +151,17 @@
 #define HAVE_LOCAL_ALIGNED_16 1
 #define HAVE_LOCAL_ALIGNED_32 1
 #define HAVE_SIMD_ALIGN_16 0
+#ifdef __GNUC__
 #define HAVE_ATOMICS_GCC 1
+#else
+#define HAVE_ATOMICS_GCC 0
+#endif
 #define HAVE_ATOMICS_SUNCC 0
+#ifdef _MSC_VER
+#define HAVE_ATOMICS_WIN32 1
+#else
 #define HAVE_ATOMICS_WIN32 0
+#endif
 #define HAVE_ATOMIC_CAS_PTR 0
 #define HAVE_ATOMIC_COMPARE_EXCHANGE 1
 #define HAVE_MACHINE_RW_BARRIER 0
@@ -163,7 +171,11 @@
 #define HAVE_SARESTART 1
 #define HAVE_SYNC_VAL_COMPARE_AND_SWAP 1
 #define HAVE_INLINE_ASM 1
+#ifdef __GNUC__
 #define HAVE_SYMVER 1
+#else
+#define HAVE_SYMVER 0
+#endif
 #define HAVE_YASM 0
 #define HAVE_BIGENDIAN 0
 #define HAVE_FAST_UNALIGNED 0

@@ -49,6 +49,23 @@ include(CPack)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
+# Add the include paths and link dependencies for bpgenc/bpgdec.
+function(bpg_image_io TARGET)
+  foreach(PKG PNG JPEG)
+    find_package(${PKG} QUIET)
+    if(${PKG}_FOUND)
+      target_compile_definitions(${TARGET} PRIVATE ${${PKG}_DEFINITIONS})
+      target_include_directories(${TARGET} PRIVATE ${${PKG}_INCLUDE_DIRS})
+      target_link_libraries(${TARGET} PRIVATE ${${PKG}_LIBRARIES})
+      message(STATUS "${PKG} found for ${TARGET}: include path ${${PKG}_INCLUDE_DIRS}, link path ${${PKG}_LIBRARIES}")
+      message(STATUS "${PKG} include path ${${PKG}_INCLUDE_DIRS}")
+      message(STATUS "${PKG} link path ${${PKG}_LIBRARIES}")
+    else()
+        message(SEND_ERROR "${PKG} not found for ${TARGET}")
+    endif()
+  endforeach()
+endfunction()
+
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
   set(CMAKE_OBJECT_PATH_MAX 260)
   message("Windows: setting CMAKE_OBJECT_PATH_MAX to ${CMAKE_OBJECT_PATH_MAX}")
@@ -260,16 +277,33 @@ if(NOT MSVC)
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gc-sections")
     endif()
 else()
-    add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
+    message(STATUS "Selected ${CMAKE_GENERATOR} generator")
+    message(STATUS "Selected ${CMAKE_VS_PLATFORM_NAME} platform")
+    add_definitions(-D_CRT_SECURE_NO_DEPRECATE
+                    -DCONFIG_BPG_VERSION="${LIBBPG_VERSION}")
 
     add_compile_options(/W3)
     add_compile_options(/wd4018)  # disable "signed/unsigned mismatch"
-    add_compile_options(/wd4503)  # disable "decorated name length exceeded, name was truncated"
+    add_compile_options(/wd4047)  # disable "'void *' differs in levels of indirection from 'int'"
+    add_compile_options(/wd4081)  # disable "expected 'newline'; found ';'"
+    add_compile_options(/wd4101)  # disable "unreferenced local variable"
+    add_compile_options(/wd4116)  # disable "unnamed type definition in parentheses"
+    add_compile_options(/wd4146)  # disable "unary minus operator applied to unsigned type, result still unsigned"
+    add_compile_options(/wd4244)  # disable "possible loss of data"
     add_compile_options(/wd4267)  # disable "conversion from 'size_t' to 'int', possible loss of data"
+    add_compile_options(/wd4334)  # disable "result of 32-bit shift implicitly converted to 64 bits"
+    add_compile_options(/wd4503)  # disable "decorated name length exceeded, name was truncated"
     add_compile_options(/wd4800)  # forcing value to bool 'true' or 'false' (performance warning)
     if(WARNINGS_AS_ERRORS)
         add_compile_options(/WX)
     endif()
+
+    set(ZLIB_LIBRARY "C:\\Program Files\\zlib\\lib\\zlibstaticd.lib" CACHE FILEPATH "Zlib library path" FORCE)
+    set(ZLIB_INCLUDE_DIR "C:\\Program Files\\zlib\\include" CACHE PATH "Zlib include path" FORCE)
+    set(JPEG_LIBRARY "C:\\Program Files\\libjpeg\\lib\\jpeg.lib" CACHE FILEPATH "JPEG library path" FORCE)
+    set(JPEG_INCLUDE_DIR "C:\\Program Files\\libjpeg\\include" CACHE PATH "JPEG include path" FORCE)
+    set(PNG_LIBRARY "C:\\Program Files\\libpng\\lib\\libpng16_staticd.lib" CACHE FILEPATH "PNG library path" FORCE)
+    set(PNG_PNG_INCLUDE_DIR "C:\\Program Files\\libpng\\include" CACHE PATH "PNG include path" FORCE)
 endif()
 
 unset(BPG_LIB_TARGETS)
@@ -281,6 +315,8 @@ if(LIBBPG_SHARED)
     if(MSVC)
         set_target_properties(bpg PROPERTIES PREFIX "lib")
         set_target_properties(bpg PROPERTIES IMPORT_PREFIX "lib")
+    else()
+        target_compile_options(bpg PUBLIC -std=c99)
     endif()
     target_compile_definitions(bpg PUBLIC
                                -D_ISOC99_SOURCE
@@ -290,7 +326,6 @@ if(LIBBPG_SHARED)
                                -D_GNU_SOURCE=1
                                -DUSE_VAR_BIT_DEPTH
                                -DUSE_PRED)
-    target_compile_options(bpg PUBLIC -std=c99)
 endif()
 
 if(LIBBPG_STATIC)
@@ -300,6 +335,8 @@ if(LIBBPG_STATIC)
     list(APPEND BPG_LIB_TARGETS bpg_static)
     if(MSVC)
         set_target_properties(bpg_static PROPERTIES PREFIX "lib")
+    else()
+        target_compile_options(bpg_static PUBLIC -std=c99)
     endif()
     target_compile_definitions(bpg_static PUBLIC
                                -D_ISOC99_SOURCE
@@ -309,44 +346,74 @@ if(LIBBPG_STATIC)
                                -D_GNU_SOURCE=1
                                -DUSE_VAR_BIT_DEPTH
                                -DUSE_PRED)
-    target_compile_options(bpg_static PUBLIC -std=c99)
 endif()
 
 if(LIBBPG_X265)
-    set(x265_12bit "${CMAKE_CURRENT_BINARY_DIR}/x265.out/12bit/libx265.a")
+    if(MSVC)
+        set(x265_12bit "${CMAKE_CURRENT_BINARY_DIR}/x265.out/12bit/${CMAKE_BUILD_TYPE}/x265-static.lib")
+        add_custom_command(OUTPUT ${x265_12bit}
+                           COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/x265.out/12bit"
+                           COMMAND ${CMAKE_COMMAND} -E chdir "${CMAKE_CURRENT_BINARY_DIR}/x265.out/12bit" ${CMAKE_COMMAND} "${CMAKE_CURRENT_SOURCE_DIR}/x265/source" ARGS "-DHIGH_BIT_DEPTH=ON" "-DEXPORT_C_API=OFF" "-DENABLE_SHARED=OFF" "-DENABLE_CLI=OFF" "-DMAIN12=ON" "-G" "${CMAKE_GENERATOR}"
+                           COMMAND ${CMAKE_COMMAND} --build "${CMAKE_CURRENT_BINARY_DIR}/x265.out/12bit"
+                           COMMENT "Build 12-bit x265 library"
+                           VERBATIM
+                           COMMAND_EXPAND_LISTS)
+        add_custom_target(libx265_12bit ALL DEPENDS ${x265_12bit})
 
-    add_custom_command(OUTPUT ${x265_12bit}
-                       COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/x265.out/12bit"
-                       COMMAND ${CMAKE_COMMAND} -E chdir "${CMAKE_CURRENT_BINARY_DIR}/x265.out/12bit" ${CMAKE_COMMAND} "${CMAKE_CURRENT_SOURCE_DIR}/x265/source" ARGS "-DHIGH_BIT_DEPTH=ON" "-DEXPORT_C_API=OFF" "-DENABLE_SHARED=OFF" "-DENABLE_CLI=OFF" "-DMAIN12=ON"
-                       COMMAND ${CMAKE_COMMAND} --build "${CMAKE_CURRENT_BINARY_DIR}/x265.out/12bit"
-                       COMMENT "Build 12-bit x265 library"
-                       VERBATIM
-                       COMMAND_EXPAND_LISTS)
-    add_custom_target(libx265_12bit ALL DEPENDS ${x265_12bit})
+        set(x265_10bit "${CMAKE_CURRENT_BINARY_DIR}/x265.out/10bit/${CMAKE_BUILD_TYPE}/x265-static.lib")
+        add_custom_command(OUTPUT ${x265_10bit}
+                           COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/x265.out/10bit"
+                           COMMAND ${CMAKE_COMMAND} -E chdir "${CMAKE_CURRENT_BINARY_DIR}/x265.out/10bit" ${CMAKE_COMMAND} "${CMAKE_CURRENT_SOURCE_DIR}/x265/source" ARGS "-DHIGH_BIT_DEPTH=ON" "-DEXPORT_C_API=OFF" "-DENABLE_SHARED=OFF" "-DENABLE_CLI=OFF" "-DMAIN10=ON" "-G" "${CMAKE_GENERATOR}"
+                           COMMAND ${CMAKE_COMMAND} --build "${CMAKE_CURRENT_BINARY_DIR}/x265.out/10bit"
+                           DEPENDS ${x265_12bit}
+                           COMMENT "Build 10-bit x265 library"
+                           VERBATIM
+                           COMMAND_EXPAND_LISTS)
+        add_custom_target(libx265_10bit ALL DEPENDS ${x265_10bit})
 
-    set(x265_10bit "${CMAKE_CURRENT_BINARY_DIR}/x265.out/10bit/libx265.a")
+        set(x265_8bit "${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit/${CMAKE_BUILD_TYPE}/x265-static.lib")
+        add_custom_command(OUTPUT ${x265_8bit}
+                           COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit"
+                           COMMAND ${CMAKE_COMMAND} -E chdir "${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit" ${CMAKE_COMMAND} "${CMAKE_CURRENT_SOURCE_DIR}/x265/source" ARGS "-DLINKED_10BIT=ON" "-DLINKED_12BIT=ON" "-DENABLE_SHARED=OFF" "-DENABLE_CLI=OFF" "-G" "${CMAKE_GENERATOR}"
+                           COMMAND ${CMAKE_COMMAND} --build "${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit"
+                           DEPENDS ${x265_10bit}
+                           COMMENT "Build 8-bit x265 library"
+                           VERBATIM
+                           COMMAND_EXPAND_LISTS)
+        add_custom_target(libx265_8bit ALL DEPENDS ${x265_8bit})
+    else()
+        set(x265_12bit "${CMAKE_CURRENT_BINARY_DIR}/x265.out/12bit/libx265.a")
+        add_custom_command(OUTPUT ${x265_12bit}
+                           COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/x265.out/12bit"
+                           COMMAND ${CMAKE_COMMAND} -E chdir "${CMAKE_CURRENT_BINARY_DIR}/x265.out/12bit" ${CMAKE_COMMAND} "${CMAKE_CURRENT_SOURCE_DIR}/x265/source" ARGS "-DHIGH_BIT_DEPTH=ON" "-DEXPORT_C_API=OFF" "-DENABLE_SHARED=OFF" "-DENABLE_CLI=OFF" "-DMAIN12=ON"
+                           COMMAND ${CMAKE_COMMAND} --build "${CMAKE_CURRENT_BINARY_DIR}/x265.out/12bit"
+                           COMMENT "Build 12-bit x265 library"
+                           VERBATIM
+                           COMMAND_EXPAND_LISTS)
+        add_custom_target(libx265_12bit ALL DEPENDS ${x265_12bit})
 
-    add_custom_command(OUTPUT ${x265_10bit}
-                       COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/x265.out/10bit"
-                       COMMAND ${CMAKE_COMMAND} -E chdir "${CMAKE_CURRENT_BINARY_DIR}/x265.out/10bit" ${CMAKE_COMMAND} "${CMAKE_CURRENT_SOURCE_DIR}/x265/source" ARGS "-DHIGH_BIT_DEPTH=ON" "-DEXPORT_C_API=OFF" "-DENABLE_SHARED=OFF" "-DENABLE_CLI=OFF" "-DMAIN10=ON"
-                       COMMAND ${CMAKE_COMMAND} --build "${CMAKE_CURRENT_BINARY_DIR}/x265.out/10bit"
-                       DEPENDS ${x265_12bit}
-                       COMMENT "Build 10-bit x265 library"
-                       VERBATIM
-                       COMMAND_EXPAND_LISTS)
-    add_custom_target(libx265_10bit ALL DEPENDS ${x265_10bit})
+        set(x265_10bit "${CMAKE_CURRENT_BINARY_DIR}/x265.out/10bit/libx265.a")
+        add_custom_command(OUTPUT ${x265_10bit}
+                           COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/x265.out/10bit"
+                           COMMAND ${CMAKE_COMMAND} -E chdir "${CMAKE_CURRENT_BINARY_DIR}/x265.out/10bit" ${CMAKE_COMMAND} "${CMAKE_CURRENT_SOURCE_DIR}/x265/source" ARGS "-DHIGH_BIT_DEPTH=ON" "-DEXPORT_C_API=OFF" "-DENABLE_SHARED=OFF" "-DENABLE_CLI=OFF" "-DMAIN10=ON"
+                           COMMAND ${CMAKE_COMMAND} --build "${CMAKE_CURRENT_BINARY_DIR}/x265.out/10bit"
+                           DEPENDS ${x265_12bit}
+                           COMMENT "Build 10-bit x265 library"
+                           VERBATIM
+                           COMMAND_EXPAND_LISTS)
+        add_custom_target(libx265_10bit ALL DEPENDS ${x265_10bit})
 
-    set(x265_8bit "${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit/libx265.a")
-
-    add_custom_command(OUTPUT ${x265_8bit}
-                       COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit"
-                       COMMAND ${CMAKE_COMMAND} -E chdir "${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit" ${CMAKE_COMMAND} "${CMAKE_CURRENT_SOURCE_DIR}/x265/source" ARGS "-DLINKED_10BIT=ON" "-DLINKED_12BIT=ON" "-DENABLE_SHARED=OFF" "-DENABLE_CLI=OFF"
-                       COMMAND ${CMAKE_COMMAND} --build "${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit"
-                       DEPENDS ${x265_10bit}
-                       COMMENT "Build 8-bit x265 library"
-                       VERBATIM
-                       COMMAND_EXPAND_LISTS)
-    add_custom_target(libx265_8bit ALL DEPENDS ${x265_8bit})
+        set(x265_8bit "${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit/libx265.a")
+        add_custom_command(OUTPUT ${x265_8bit}
+                           COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit"
+                           COMMAND ${CMAKE_COMMAND} -E chdir "${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit" ${CMAKE_COMMAND} "${CMAKE_CURRENT_SOURCE_DIR}/x265/source" ARGS "-DLINKED_10BIT=ON" "-DLINKED_12BIT=ON" "-DENABLE_SHARED=OFF" "-DENABLE_CLI=OFF"
+                           COMMAND ${CMAKE_COMMAND} --build "${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit"
+                           DEPENDS ${x265_10bit}
+                           COMMENT "Build 8-bit x265 library"
+                           VERBATIM
+                           COMMAND_EXPAND_LISTS)
+        add_custom_target(libx265_8bit ALL DEPENDS ${x265_8bit})
+    endif()
 endif()
 
 if(LIBBPG_JCTVC)
@@ -357,35 +424,36 @@ endif()
 
 add_executable(bpgdec ${LIBBPG_BPGDEC_SOURCES})
 if(MSVC)
-    target_link_libraries(bpgdec bpg png z)
+    target_link_libraries(bpgdec PRIVATE bpg)
 else()
     if(NOT APPLE)
-        target_link_libraries(bpgdec rt)
+        target_link_libraries(bpgdec PRIVATE rt)
     endif()
-    target_link_libraries(bpgdec bpg png z m pthread)
+    target_link_libraries(bpgdec PRIVATE bpg m pthread)
 endif()
+bpg_image_io(bpgdec)
 
 add_executable(bpgenc ${LIBBPG_BPGENC_SOURCES})
 if(LIBBPG_JCTVC)
     if(MSVC)
-        target_link_libraries(bpgenc jctvc png jpeg z)
+        target_link_libraries(bpgenc PRIVATE jctvc)
     else()
         if(NOT APPLE)
-            target_link_libraries(bpgenc rt)
+            target_link_libraries(bpgenc PRIVATE rt)
         endif()
-        target_link_libraries(bpgenc jctvc png jpeg z m pthread)
+        target_link_libraries(bpgenc PRIVATE jctvc z m pthread)
     endif()
     target_compile_options(bpgenc PRIVATE -Wno-unused-but-set_variable)
     target_compile_definitions(bpgenc PRIVATE -DUSE_JCTVC)
     target_include_directories(bpgenc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/jctvc)
 else()
     if(MSVC)
-        target_link_libraries(bpgenc png jpeg z)
+        target_link_libraries(bpgenc PRIVATE ${x265_8bit} ${x265_12bit} ${x265_10bit})
     else()
         if(NOT APPLE)
-            target_link_libraries(bpgenc rt)
+            target_link_libraries(bpgenc PRIVATE rt)
         endif()
-        target_link_libraries(bpgenc ${x265_8bit} ${x265_12bit} ${x265_10bit} png jpeg z m pthread stdc++)
+        target_link_libraries(bpgenc PRIVATE ${x265_8bit} ${x265_12bit} ${x265_10bit} z m pthread stdc++)
     endif()
     target_compile_definitions(bpgenc PRIVATE -DUSE_X265)
     target_include_directories(bpgenc PRIVATE
@@ -393,12 +461,11 @@ else()
                                ${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit)
     add_dependencies(bpgenc libx265_8bit)
 endif()
+bpg_image_io(bpgenc)
 
-if(LIBBPG_BPGVIEW)
-    add_executable(bpgview ${LIBBPG_BPGVIEW_SOURCES})
-    if(MSVC)
-        target_link_libraries(bpgview bpg mingw32 SDLmain SDL_image SDL mwindows)
-    else()
+if(NOT MSVC)
+    if(LIBBPG_BPGVIEW)
+        add_executable(bpgview ${LIBBPG_BPGVIEW_SOURCES})
         if(NOT APPLE)
             target_link_libraries(bpgview rt)
         endif()
