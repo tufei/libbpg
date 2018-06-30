@@ -45,7 +45,11 @@
 #endif
 
 #include <assert.h>
+#ifndef _BPG_API
 #include "libbpg.h"
+#else
+#include "bpg_decoder.h"
+#endif /* _BPG_API */
 
 #define BPG_HEADER_MAGIC 0x425047fb
 

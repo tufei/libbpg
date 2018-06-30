@@ -31,7 +31,12 @@
 #include <unistd.h>
 #endif
 
+#ifdef _BPG_API
+#include "bpg_encoder.h"
+#include "bpg_encoder_priv.h"
+#else
 #include "bpgenc.h"
+#endif /* _BPG_API */
 
 #include "x265.h"
 

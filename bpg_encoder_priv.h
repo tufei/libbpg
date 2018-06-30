@@ -21,30 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#ifdef __cplusplus
-extern "C" {
-#endif
 
-#ifdef _BPG_API
-#include "bpg_encoder.h"
-#else
-#include "libbpg.h"
-
-typedef struct {
-    int w, h;
-    BPGImageFormatEnum format; /* x_VIDEO values are forbidden here */
-    uint8_t c_h_phase; /* 4:2:2 or 4:2:0 : give the horizontal chroma
-                          position. 0=MPEG2, 1=JPEG. */
-    uint8_t has_alpha;
-    uint8_t has_w_plane;
-    uint8_t limited_range;
-    uint8_t premultiplied_alpha;
-    BPGColorSpaceEnum color_space;
-    uint8_t bit_depth;
-    uint8_t pixel_shift; /* (1 << pixel_shift) bytes per pixel */
-    uint8_t *data[4];
-    int linesize[4];
-} Image;
+#ifndef _BPG_ENCODER_PRIV_H
+#define _BPG_ENCODER_PRIV_H
 
 typedef struct {
     int width;
@@ -68,17 +47,23 @@ typedef struct {
     int (*close)(HEVCEncoderContext *s, uint8_t **pbuf);
 } HEVCEncoder;
 
+struct BPGEncoderContext {
+    BPGEncoderParameters params;
+    BPGMetaData *first_md;
+    HEVCEncoder *encoder;
+    int frame_count;
+    HEVCEncoderContext *enc_ctx;
+    HEVCEncoderContext *alpha_enc_ctx;
+    int frame_ticks;
+    uint16_t *frame_duration_tab;
+    int frame_duration_tab_size;
+};
+
 extern HEVCEncoder jctvc_encoder;
 extern HEVCEncoder x265_hevc_encoder;
 
 int x265_encode_picture(uint8_t **pbuf, Image *img,
                         const HEVCEncodeParams *params);
-#endif /* _BPG_API */
 
-void save_yuv1(Image *img, FILE *f);
-void save_yuv(Image *img, const char *filename);
-
-#ifdef __cplusplus
-}
-#endif
+#endif /* _BPG_ENCODER_PRIV_H */
 

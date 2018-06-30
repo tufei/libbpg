@@ -16,13 +16,14 @@ set(LIBBPG_BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(LIBBPG_MAJOR 0)
 set(LIBBPG_MINOR 9)
 set(LIBBPG_RELEASE 8)
-set(LIBBPG_NAME bpg)
+set(LIBBPG_DEC_NAME bpg_dec)
+set(LIBBPG_ENC_NAME bpg_enc)
 set(LIBBPG_VERSION ${LIBBPG_MAJOR}.${LIBBPG_MINOR}.${LIBBPG_RELEASE})
 
 include(GNUInstallDirs)
 
 # Command line options
-option(LIBBPG_SHARED "Build shared lib" ON)
+option(LIBBPG_SHARED "Build shared lib" OFF)
 option(LIBBPG_STATIC "Build static lib" ON)
 option(LIBBPG_INSTALL_PREFIX "Installation prefix" "${CMAKE_INSTALL_PREFIX}")
 
@@ -92,11 +93,19 @@ else()
 endif()
 
 # Our source files
-set(LIBBPG_PUBLIC_HEADERS
-    libbpg.h
+set(LIBBPG_PUBLIC_HEADERS libbpg.h bpg.h)
+
+set(LIBBPG_DEC_PUBLIC_HEADERS
+    ${LIBBPG_PUBLIC_HEADERS}
+    bpg_decoder.h
 )
 
-set(LIBBPG_PRIVATE_HEADERS
+set(LIBBPG_ENC_PUBLIC_HEADERS
+    ${LIBBPG_PUBLIC_HEADERS}
+    bpg_encoder.h
+)
+
+set(LIBBPG_DEC_PRIVATE_HEADERS
     config.h
     libavcodec/avcodec.h
     libavcodec/bswapdsp.h
@@ -128,9 +137,9 @@ set(LIBBPG_PRIVATE_HEADERS
     libavutil/pixdesc.h
 )
 
-set(LIBBPG_SOURCES
-    ${LIBBPG_PUBLIC_HEADERS}
-    ${LIBBPG_PRIVATE_HEADERS}
+set(LIBBPG_DEC_SOURCES
+    ${LIBBPG_DEC_PUBLIC_HEADERS}
+    ${LIBBPG_DEC_PRIVATE_HEADERS}
     libavcodec/cabac.c
     libavcodec/golomb.c
     libavcodec/hevc.c
@@ -151,6 +160,11 @@ set(LIBBPG_SOURCES
     libavutil/mem.c
     libavutil/pixdesc.c
     libbpg.c
+)
+
+set(LIBBPG_ENC_SOURCES
+    ${LIBBPG_ENC_PUBLIC_HEADERS}
+    bpg_encoder.c
 )
 
 set(LIBBPG_JCTVC_SOURCES
@@ -211,19 +225,22 @@ set(LIBBPG_BPGDEC_SOURCES
 )
 
 if(LIBBPG_X265)
-    set(LIBBPG_BPGENC_SOURCES
-        bpgenc.h
+    set(LIBBPG_ENC_SOURCES
+        ${LIBBPG_ENC_SOURCES}
+        bpg_encoder_priv.h
         x265/source/x265.h
-        bpgenc.c
-        x265_glue.c
-    )
+        x265_glue.c)
 else()
-    set(LIBBPG_BPGENC_SOURCES
-        bpgenc.h
-        bpgenc.c
-        jctvc_glue.cpp
-    )
+    set(LIBBPG_ENC_SOURCES
+        ${LIBBPG_ENC_SOURCES}
+        bpg_encoder_priv.h
+        jctvc_glue.cpp)
 endif()
+
+set(LIBBPG_BPGENC_SOURCES
+    bpgenc.h
+    bpgenc.c
+)
 
 set(LIBBPG_BPGVIEW_SOURCES
     bpgview.c
@@ -235,6 +252,7 @@ if(NOT MSVC)
     add_definitions(-D_FILE_OFFSET_BITS=64
                     -D_LARGEFILE_SOURCE
                     -D_REENTRANT
+                    -D_BPG_API
                     -DCONFIG_BPG_VERSION="${LIBBPG_VERSION}")
 
     add_compile_options(-Os
@@ -280,6 +298,7 @@ else()
     message(STATUS "Selected ${CMAKE_GENERATOR} generator")
     message(STATUS "Selected ${CMAKE_VS_PLATFORM_NAME} platform")
     add_definitions(-D_CRT_SECURE_NO_DEPRECATE
+                    -D_BPG_API
                     -DCONFIG_BPG_VERSION="${LIBBPG_VERSION}")
 
     add_compile_options(/W3)
@@ -306,19 +325,20 @@ else()
     set(PNG_PNG_INCLUDE_DIR "C:\\Program Files\\libpng\\include" CACHE PATH "PNG include path" FORCE)
 endif()
 
-unset(BPG_LIB_TARGETS)
+unset(BPG_DEC_LIB_TARGETS)
+unset(BPG_ENC_LIB_TARGETS)
 
 if(LIBBPG_SHARED)
-    add_library(bpg SHARED ${LIBBPG_SOURCES})
-    set(BPG_LIB_TARGETS bpg)
-    set_target_properties(bpg PROPERTIES OUTPUT_NAME ${LIBBPG_NAME})
+    add_library(bpg_dec SHARED ${LIBBPG_DEC_SOURCES})
+    set(BPG_DEC_LIB_TARGETS bpg_dec)
+    set_target_properties(bpg_dec PROPERTIES OUTPUT_NAME ${LIBBPG_DEC_NAME})
     if(MSVC)
-        set_target_properties(bpg PROPERTIES PREFIX "lib")
-        set_target_properties(bpg PROPERTIES IMPORT_PREFIX "lib")
+        set_target_properties(bpg_dec PROPERTIES PREFIX "lib")
+        set_target_properties(bpg_dec PROPERTIES IMPORT_PREFIX "lib")
     else()
-        target_compile_options(bpg PUBLIC -std=c99)
+        target_compile_options(bpg_dec PUBLIC -std=c99)
     endif()
-    target_compile_definitions(bpg PUBLIC
+    target_compile_definitions(bpg_dec PUBLIC
                                -D_ISOC99_SOURCE
                                -D_POSIX_C_SOURCE=200112
                                -D_XOPEN_SOURCE=600
@@ -326,19 +346,20 @@ if(LIBBPG_SHARED)
                                -D_GNU_SOURCE=1
                                -DUSE_VAR_BIT_DEPTH
                                -DUSE_PRED)
+    set_target_properties(bpg_dec PROPERTIES PUBLIC_HEADER "${LIBBPG_DEC_PUBLIC_HEADERS}")
 endif()
 
 if(LIBBPG_STATIC)
-    add_library(bpg_static STATIC ${LIBBPG_SOURCES})
-    set_target_properties(bpg_static PROPERTIES OUTPUT_NAME ${LIBBPG_NAME}
+    add_library(bpg_dec_static STATIC ${LIBBPG_DEC_SOURCES})
+    set_target_properties(bpg_dec_static PROPERTIES OUTPUT_NAME ${LIBBPG_DEC_NAME}
                           CLEAN_DIRECT_OUTPUT 1)
-    list(APPEND BPG_LIB_TARGETS bpg_static)
+    list(APPEND BPG_DEC_LIB_TARGETS bpg_dec_static)
     if(MSVC)
-        set_target_properties(bpg_static PROPERTIES PREFIX "lib")
+        set_target_properties(bpg_dec_static PROPERTIES PREFIX "lib")
     else()
-        target_compile_options(bpg_static PUBLIC -std=c99)
+        target_compile_options(bpg_dec_static PUBLIC -std=c99)
     endif()
-    target_compile_definitions(bpg_static PUBLIC
+    target_compile_definitions(bpg_dec_static PUBLIC
                                -D_ISOC99_SOURCE
                                -D_POSIX_C_SOURCE=200112
                                -D_XOPEN_SOURCE=600
@@ -346,6 +367,7 @@ if(LIBBPG_STATIC)
                                -D_GNU_SOURCE=1
                                -DUSE_VAR_BIT_DEPTH
                                -DUSE_PRED)
+    set_target_properties(bpg_dec_static PROPERTIES PUBLIC_HEADER "${LIBBPG_DEC_PUBLIC_HEADERS}")
 endif()
 
 if(LIBBPG_X265)
@@ -422,45 +444,79 @@ if(LIBBPG_JCTVC)
     target_include_directories(jctvc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/jctvc)
 endif()
 
+if(LIBBPG_SHARED)
+    add_library(bpg_enc SHARED ${LIBBPG_ENC_SOURCES})
+    set(BPG_ENC_LIB_TARGETS bpg_enc)
+    set_target_properties(bpg_enc PROPERTIES OUTPUT_NAME ${LIBBPG_ENC_NAME})
+    if(MSVC)
+        set_target_properties(bpg_enc PROPERTIES PREFIX "lib")
+        set_target_properties(bpg_enc PROPERTIES IMPORT_PREFIX "lib")
+    endif()
+    set_target_properties(bpg_enc PROPERTIES PUBLIC_HEADER "${LIBBPG_ENC_PUBLIC_HEADERS}")
+
+    if(LIBBPG_JCTVC)
+        target_link_libraries(bpg_enc PRIVATE jctvc)
+        target_compile_options(bpg_enc PRIVATE -Wno-unused-but-set-variable)
+        target_compile_definitions(bpg_enc PRIVATE -D_BPG_API -DUSE_JCTVC)
+        target_include_directories(bpg_enc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/jctvc)
+    else()
+        target_link_libraries(bpg_enc PRIVATE ${x265_8bit} ${x265_12bit} ${x265_10bit} stdc++)
+        target_compile_definitions(bpg_enc PRIVATE -D_BPG_API -DUSE_X265)
+        target_compile_options(bpg_enc PUBLIC -std=c99)
+        target_include_directories(bpg_enc PRIVATE
+                                   ${CMAKE_CURRENT_SOURCE_DIR}/x265/source
+                                   ${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit)
+        add_dependencies(bpg_enc libx265_8bit)
+    endif()
+endif()
+
+if(LIBBPG_STATIC)
+    add_library(bpg_enc_static STATIC ${LIBBPG_ENC_SOURCES})
+    set_target_properties(bpg_enc_static PROPERTIES OUTPUT_NAME ${LIBBPG_ENC_NAME}
+                          CLEAN_DIRECT_OUTPUT 1)
+    list(APPEND BPG_ENC_LIB_TARGETS bpg_enc_static)
+    if(MSVC)
+        set_target_properties(bpg_enc_static PROPERTIES PREFIX "lib")
+    endif()
+    set_target_properties(bpg_enc_static PROPERTIES PUBLIC_HEADER "${LIBBPG_ENC_PUBLIC_HEADERS}")
+
+    if(LIBBPG_JCTVC)
+        target_link_libraries(bpg_enc_static PUBLIC jctvc)
+        target_compile_options(bpg_enc_static PRIVATE -Wno-unused-but-set_variable)
+        target_compile_definitions(bpg_enc_static PRIVATE -D_BPG_API -DUSE_JCTVC)
+        target_include_directories(bpg_enc_static PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/jctvc)
+    else()
+        target_link_libraries(bpg_enc_static PUBLIC ${x265_8bit} ${x265_12bit} ${x265_10bit} stdc++)
+        target_compile_definitions(bpg_enc_static PRIVATE -D_BPG_API -DUSE_X265)
+        target_compile_options(bpg_enc_static PUBLIC -std=c99)
+        target_include_directories(bpg_enc_static PRIVATE
+                                   ${CMAKE_CURRENT_SOURCE_DIR}/x265/source
+                                   ${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit)
+        add_dependencies(bpg_enc_static libx265_8bit)
+    endif()
+endif()
+
 add_executable(bpgdec ${LIBBPG_BPGDEC_SOURCES})
 if(MSVC)
-    target_link_libraries(bpgdec PRIVATE bpg)
+    target_link_libraries(bpgdec PRIVATE bpg_dec_static)
 else()
     if(NOT APPLE)
         target_link_libraries(bpgdec PRIVATE rt)
     endif()
-    target_link_libraries(bpgdec PRIVATE bpg m pthread)
+    target_link_libraries(bpgdec PRIVATE bpg_dec_static m pthread)
 endif()
 bpg_image_io(bpgdec)
 
 add_executable(bpgenc ${LIBBPG_BPGENC_SOURCES})
-if(LIBBPG_JCTVC)
-    if(MSVC)
-        target_link_libraries(bpgenc PRIVATE jctvc)
-    else()
-        if(NOT APPLE)
-            target_link_libraries(bpgenc PRIVATE rt)
-        endif()
-        target_link_libraries(bpgenc PRIVATE jctvc z m pthread)
-    endif()
-    target_compile_options(bpgenc PRIVATE -Wno-unused-but-set_variable)
-    target_compile_definitions(bpgenc PRIVATE -DUSE_JCTVC)
-    target_include_directories(bpgenc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/jctvc)
+if(MSVC)
+    target_link_libraries(bpgenc PRIVATE bpg_enc_static)
 else()
-    if(MSVC)
-        target_link_libraries(bpgenc PRIVATE ${x265_8bit} ${x265_12bit} ${x265_10bit})
-    else()
-        if(NOT APPLE)
-            target_link_libraries(bpgenc PRIVATE rt)
-        endif()
-        target_link_libraries(bpgenc PRIVATE ${x265_8bit} ${x265_12bit} ${x265_10bit} z m pthread stdc++)
+    if(NOT APPLE)
+        target_link_libraries(bpgenc PRIVATE rt)
     endif()
-    target_compile_definitions(bpgenc PRIVATE -DUSE_X265)
-    target_include_directories(bpgenc PRIVATE
-                               ${CMAKE_CURRENT_SOURCE_DIR}/x265/source
-                               ${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit)
-    add_dependencies(bpgenc libx265_8bit)
+    target_link_libraries(bpgenc PRIVATE bpg_enc_static z m pthread)
 endif()
+target_compile_options(bpgenc PRIVATE -Wno-unused-but-set-variable)
 bpg_image_io(bpgenc)
 
 if(NOT MSVC)
@@ -469,15 +525,18 @@ if(NOT MSVC)
         if(NOT APPLE)
             target_link_libraries(bpgview rt)
         endif()
-        target_link_libraries(bpgview bpg m pthread SDL_image SDL)
+        target_link_libraries(bpgview bpg_dec_static m pthread SDL_image SDL)
     endif()
 endif()
 
 # ------------------------------------------------
 # install
 
-install(TARGETS bpgdec bpgenc
-        RUNTIME DESTINATION bin)
+install(TARGETS bpgdec bpgenc bpg_enc_static bpg_dec_static
+        RUNTIME DESTINATION bin
+        PUBLIC_HEADER DESTINATION include/${CMAKE_PROJECT_NAME}
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib)
 
 if(NOT WIN32)
   set(CPACK_PACKAGE_EXT "tar.gz")

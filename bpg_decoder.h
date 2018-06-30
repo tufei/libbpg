@@ -21,64 +21,17 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#ifndef _LIBBPG_H
-#define _LIBBPG_H
+#ifndef _BPG_DECODER_H
+#define _BPG_DECODER_H
 
-#include <inttypes.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#ifndef _BPG_API
+#include "libbpg.h"
+
 typedef struct BPGDecoderContext BPGDecoderContext;
-#endif /* _BPG_API */
 
-typedef enum {
-    BPG_FORMAT_GRAY,
-    BPG_FORMAT_420, /* chroma at offset (0.5, 0.5) (JPEG) */
-    BPG_FORMAT_422, /* chroma at offset (0.5, 0) (JPEG) */
-    BPG_FORMAT_444,
-    BPG_FORMAT_420_VIDEO, /* chroma at offset (0, 0.5) (MPEG2) */
-    BPG_FORMAT_422_VIDEO, /* chroma at offset (0, 0) (MPEG2) */
-} BPGImageFormatEnum;
-
-typedef enum {
-    BPG_CS_YCbCr,
-    BPG_CS_RGB,
-    BPG_CS_YCgCo,
-    BPG_CS_YCbCr_BT709,
-    BPG_CS_YCbCr_BT2020,
-
-    BPG_CS_COUNT,
-} BPGColorSpaceEnum;
-
-typedef struct {
-    uint32_t width;
-    uint32_t height;
-    uint8_t format; /* see BPGImageFormatEnum */
-    uint8_t has_alpha; /* TRUE if an alpha plane is present */
-    uint8_t color_space; /* see BPGColorSpaceEnum */
-    uint8_t bit_depth;
-    uint8_t premultiplied_alpha; /* TRUE if the color is alpha premultiplied */
-    uint8_t has_w_plane; /* TRUE if a W plane is present (for CMYK encoding) */
-    uint8_t limited_range; /* TRUE if limited range for the color */
-    uint8_t has_animation; /* TRUE if the image contains animations */
-    uint16_t loop_count; /* animations: number of loop, 0 = infinity */
-} BPGImageInfo;
-
-typedef enum {
-    BPG_EXTENSION_TAG_EXIF = 1,
-    BPG_EXTENSION_TAG_ICCP = 2,
-    BPG_EXTENSION_TAG_XMP = 3,
-    BPG_EXTENSION_TAG_THUMBNAIL = 4,
-    BPG_EXTENSION_TAG_ANIM_CONTROL = 5,
-} BPGExtensionTagEnum;
-
-typedef struct BPGExtensionData {
-    BPGExtensionTagEnum tag;
-    uint32_t buf_len;
-    uint8_t *buf;
-    struct BPGExtensionData *next;
-} BPGExtensionData;
-
-#ifndef _BPG_API
 typedef enum {
     BPG_OUTPUT_FORMAT_RGB24,
     BPG_OUTPUT_FORMAT_RGBA32, /* not premultiplied alpha */
@@ -137,6 +90,10 @@ int bpg_decoder_get_info_from_buf(BPGImageInfo *p,
                                   const uint8_t *buf, int buf_len);
 /* Free the extension data returned by bpg_decoder_get_info_from_buf() */
 void bpg_decoder_free_extension_data(BPGExtensionData *first_md);
-#endif /* _BPG_API */
 
-#endif /* _LIBBPG_H */
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* _BPG_DECODER_H */
+

@@ -41,7 +41,11 @@
 #include <png.h>
 #endif
 
+#ifndef _BPG_API
 #include "libbpg.h"
+#else
+#include "bpg_decoder.h"
+#endif /* _BPG_API */
 
 static void ppm_save(BPGDecoderContext *img, const char *filename)
 {

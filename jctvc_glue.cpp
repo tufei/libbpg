@@ -7,6 +7,11 @@
 #include "TLibCommon/Debug.h"
 #include "TLibEncoder/TEncAnalyze.h"
 
+#ifdef _BPG_API
+#include "bpg_encoder.h"
+#include "bpg_encoder_priv.h"
+#endif /* _BPG_API */
+
 #include "bpgenc.h"
 
 struct HEVCEncoderContext {

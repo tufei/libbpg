@@ -33,7 +33,11 @@
 #include <SDL/SDL.h>
 #include <SDL/SDL_image.h>
 
+#ifndef _BPG_API
 #include "libbpg.h"
+#else
+#include "bpg_decoder.h"
+#endif /* _BPG_API */
 
 typedef enum {
     BG_BLACK,
