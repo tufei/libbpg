@@ -481,12 +481,12 @@ if(LIBBPG_STATIC)
     set_target_properties(bpg_enc_static PROPERTIES PUBLIC_HEADER "${LIBBPG_ENC_PUBLIC_HEADERS}")
 
     if(LIBBPG_JCTVC)
-        target_link_libraries(bpg_enc_static PUBLIC jctvc)
+        target_link_libraries(bpg_enc_static PRIVATE jctvc)
         target_compile_options(bpg_enc_static PRIVATE -Wno-unused-but-set_variable)
         target_compile_definitions(bpg_enc_static PRIVATE -D_BPG_API -DUSE_JCTVC)
         target_include_directories(bpg_enc_static PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/jctvc)
     else()
-        target_link_libraries(bpg_enc_static PUBLIC ${x265_8bit} ${x265_12bit} ${x265_10bit} stdc++)
+        target_link_libraries(bpg_enc_static PRIVATE ${x265_8bit} ${x265_12bit} ${x265_10bit} stdc++)
         target_compile_definitions(bpg_enc_static PRIVATE -D_BPG_API -DUSE_X265)
         target_compile_options(bpg_enc_static PUBLIC -std=c99)
         target_include_directories(bpg_enc_static PRIVATE
@@ -537,6 +537,19 @@ install(TARGETS bpgdec bpgenc bpg_enc_static bpg_dec_static
         PUBLIC_HEADER DESTINATION include/${CMAKE_PROJECT_NAME}
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)
+if(LIBBPG_JCTVC)
+    install(TARGETS jctvc ARCHIVE DESTINATION lib)
+else()
+    install(FILES ${x265_8bit}
+            DESTINATION lib
+            RENAME libx265_8bit.a)
+    install(FILES ${x265_10bit}
+            DESTINATION lib
+            RENAME libx265_10bit.a)
+    install(FILES ${x265_12bit}
+            DESTINATION lib
+            RENAME libx265_12bit.a)
+endif()
 
 if(NOT WIN32)
   set(CPACK_PACKAGE_EXT "tar.gz")
