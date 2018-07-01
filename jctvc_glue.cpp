@@ -1,7 +1,10 @@
 #ifdef WIN32
 #include <windows.h>
-#endif
+#include <process.h>
+#include <io.h>
+#else
 #include <unistd.h>
+#endif
 #include <iostream>
 #include "TAppEncTop.h"
 #include "TLibCommon/Debug.h"
@@ -13,6 +16,12 @@
 #endif /* _BPG_API */
 
 #include "bpgenc.h"
+
+#ifdef _MSC_VER
+#define strdup _strdup
+#define unlink _unlink
+#define getpid _getpid
+#endif
 
 struct HEVCEncoderContext {
     HEVCEncodeParams params;
