@@ -317,12 +317,21 @@ else()
         add_compile_options(/WX)
     endif()
 
-    set(ZLIB_LIBRARY "C:\\Program Files\\zlib\\lib\\zlibstaticd.lib" CACHE FILEPATH "Zlib library path" FORCE)
     set(ZLIB_INCLUDE_DIR "C:\\Program Files\\zlib\\include" CACHE PATH "Zlib include path" FORCE)
-    set(JPEG_LIBRARY "C:\\Program Files\\libjpeg\\lib\\jpeg.lib" CACHE FILEPATH "JPEG library path" FORCE)
-    set(JPEG_INCLUDE_DIR "C:\\Program Files\\libjpeg\\include" CACHE PATH "JPEG include path" FORCE)
-    set(PNG_LIBRARY "C:\\Program Files\\libpng\\lib\\libpng16_staticd.lib" CACHE FILEPATH "PNG library path" FORCE)
+    #set(JPEG_INCLUDE_DIR "C:\\Program Files\\libjpeg\\include" CACHE PATH "JPEG include path" FORCE)
+    set(JPEG_INCLUDE_DIR "C:\\mozjpeg64\\\\include" CACHE PATH "JPEG include path" FORCE)
     set(PNG_PNG_INCLUDE_DIR "C:\\Program Files\\libpng\\include" CACHE PATH "PNG include path" FORCE)
+    if(${CMAKE_BUILD_TYPE} MATCHES "Debug")
+        set(ZLIB_LIBRARY "C:\\Program Files\\zlib\\lib\\zlibstaticd.lib" CACHE FILEPATH "Zlib library path" FORCE)
+        #set(JPEG_LIBRARY "C:\\Program Files\\libjpeg\\lib\\jpeg.lib" CACHE FILEPATH "JPEG library path" FORCE)
+        set(JPEG_LIBRARY "C:\\mozjpeg64\\\\lib\\jpeg-static.lib" CACHE FILEPATH "JPEG library path" FORCE)
+        set(PNG_LIBRARY "C:\\Program Files\\libpng\\lib\\libpng16_staticd.lib" CACHE FILEPATH "PNG library path" FORCE)
+    else()
+        set(ZLIB_LIBRARY "C:\\Program Files\\zlib\\lib\\zlibstatic.lib" CACHE FILEPATH "Zlib library path" FORCE)
+        #set(JPEG_LIBRARY "C:\\Program Files\\libjpeg\\lib\\jpeg.lib" CACHE FILEPATH "JPEG library path" FORCE)
+        set(JPEG_LIBRARY "C:\\mozjpeg64\\\\lib\\jpeg-static.lib" CACHE FILEPATH "JPEG library path" FORCE)
+        set(PNG_LIBRARY "C:\\Program Files\\libpng\\lib\\libpng16_static.lib" CACHE FILEPATH "PNG library path" FORCE)
+   endif()
 endif()
 
 unset(BPG_DEC_LIB_TARGETS)
@@ -375,7 +384,7 @@ if(LIBBPG_X265)
         set(x265_12bit "${CMAKE_CURRENT_BINARY_DIR}/x265.out/12bit/${CMAKE_BUILD_TYPE}/x265-static.lib")
         add_custom_command(OUTPUT ${x265_12bit}
                            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/x265.out/12bit"
-                           COMMAND ${CMAKE_COMMAND} -E chdir "${CMAKE_CURRENT_BINARY_DIR}/x265.out/12bit" ${CMAKE_COMMAND} "${CMAKE_CURRENT_SOURCE_DIR}/x265/source" ARGS "-DHIGH_BIT_DEPTH=ON" "-DEXPORT_C_API=OFF" "-DENABLE_SHARED=OFF" "-DENABLE_CLI=OFF" "-DMAIN12=ON" "-G" "${CMAKE_GENERATOR}"
+                           COMMAND ${CMAKE_COMMAND} -E chdir "${CMAKE_CURRENT_BINARY_DIR}/x265.out/12bit" ${CMAKE_COMMAND} "${CMAKE_CURRENT_SOURCE_DIR}/x265/source" ARGS "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}" "-DHIGH_BIT_DEPTH=ON" "-DEXPORT_C_API=OFF" "-DENABLE_SHARED=OFF" "-DENABLE_CLI=OFF" "-DMAIN12=ON" "-G" "${CMAKE_GENERATOR}"
                            COMMAND ${CMAKE_COMMAND} --build "${CMAKE_CURRENT_BINARY_DIR}/x265.out/12bit"
                            COMMENT "Build 12-bit x265 library"
                            VERBATIM
@@ -385,7 +394,7 @@ if(LIBBPG_X265)
         set(x265_10bit "${CMAKE_CURRENT_BINARY_DIR}/x265.out/10bit/${CMAKE_BUILD_TYPE}/x265-static.lib")
         add_custom_command(OUTPUT ${x265_10bit}
                            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/x265.out/10bit"
-                           COMMAND ${CMAKE_COMMAND} -E chdir "${CMAKE_CURRENT_BINARY_DIR}/x265.out/10bit" ${CMAKE_COMMAND} "${CMAKE_CURRENT_SOURCE_DIR}/x265/source" ARGS "-DHIGH_BIT_DEPTH=ON" "-DEXPORT_C_API=OFF" "-DENABLE_SHARED=OFF" "-DENABLE_CLI=OFF" "-DMAIN10=ON" "-G" "${CMAKE_GENERATOR}"
+                           COMMAND ${CMAKE_COMMAND} -E chdir "${CMAKE_CURRENT_BINARY_DIR}/x265.out/10bit" ${CMAKE_COMMAND} "${CMAKE_CURRENT_SOURCE_DIR}/x265/source" ARGS "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}" "-DHIGH_BIT_DEPTH=ON" "-DEXPORT_C_API=OFF" "-DENABLE_SHARED=OFF" "-DENABLE_CLI=OFF" "-DMAIN10=ON" "-G" "${CMAKE_GENERATOR}"
                            COMMAND ${CMAKE_COMMAND} --build "${CMAKE_CURRENT_BINARY_DIR}/x265.out/10bit"
                            DEPENDS ${x265_12bit}
                            COMMENT "Build 10-bit x265 library"
@@ -396,7 +405,7 @@ if(LIBBPG_X265)
         set(x265_8bit "${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit/${CMAKE_BUILD_TYPE}/x265-static.lib")
         add_custom_command(OUTPUT ${x265_8bit}
                            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit"
-                           COMMAND ${CMAKE_COMMAND} -E chdir "${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit" ${CMAKE_COMMAND} "${CMAKE_CURRENT_SOURCE_DIR}/x265/source" ARGS "-DLINKED_10BIT=ON" "-DLINKED_12BIT=ON" "-DENABLE_SHARED=OFF" "-DENABLE_CLI=OFF" "-G" "${CMAKE_GENERATOR}"
+                           COMMAND ${CMAKE_COMMAND} -E chdir "${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit" ${CMAKE_COMMAND} "${CMAKE_CURRENT_SOURCE_DIR}/x265/source" ARGS "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}" "-DLINKED_10BIT=ON" "-DLINKED_12BIT=ON" "-DENABLE_SHARED=OFF" "-DENABLE_CLI=OFF" "-G" "${CMAKE_GENERATOR}"
                            COMMAND ${CMAKE_COMMAND} --build "${CMAKE_CURRENT_BINARY_DIR}/x265.out/8bit"
                            DEPENDS ${x265_10bit}
                            COMMENT "Build 8-bit x265 library"
