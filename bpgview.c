@@ -29,9 +29,12 @@
 #include <inttypes.h>
 #ifdef WIN32
 #include <windows.h>
-#endif
+#include <SDL.h>
+#include <SDL_image.h>
+#else
 #include <SDL/SDL.h>
 #include <SDL/SDL_image.h>
+#endif
 
 #ifndef _BPG_API
 #include "libbpg.h"
@@ -52,6 +55,10 @@ typedef struct {
 typedef struct {
     int screen_w, screen_h;
     int win_w, win_h;
+    SDL_Window *window;
+    SDL_Renderer *renderer;
+    SDL_Texture *texture;
+    SDL_RendererInfo info;
     SDL_Surface *screen;
 
     int img_w, img_h;
@@ -124,7 +131,7 @@ Frame *bpg_load(FILE *f, int *pframe_count, int *ploop_count)
             break;
         bpg_decoder_get_frame_duration(s, &delay_num, &delay_den);
         frames = realloc(frames, sizeof(frames[0]) * (frame_count + 1));
-        img = SDL_CreateRGBSurface(SDL_HWSURFACE, bi->width, bi->height, 32,
+        img = SDL_CreateRGBSurface(0, bi->width, bi->height, 32,
                                    rmask, gmask, bmask, amask);
         if (!img) 
             goto fail;
@@ -142,6 +149,7 @@ Frame *bpg_load(FILE *f, int *pframe_count, int *ploop_count)
     *pframe_count = frame_count;
     *ploop_count = bi->loop_count;
     return frames;
+
  fail:
     bpg_decoder_close(s);
     for(i = 0; i < frame_count; i++) {
@@ -149,6 +157,7 @@ Frame *bpg_load(FILE *f, int *pframe_count, int *ploop_count)
     }
     free(frames);
     *pframe_count = 0;
+
     return NULL;
 }
 
@@ -271,9 +280,11 @@ void draw_image(DispContext *dc)
     r.y = dc->pos_y;
     r.w = 0;
     r.h = 0;
-    SDL_BlitSurface (dc->frames[dc->frame_index].img, NULL, dc->screen, &r);
-
-    SDL_Flip(dc->screen);
+    SDL_BlitSurface(dc->frames[dc->frame_index].img, NULL, dc->screen, &r);
+    SDL_UpdateTexture(dc->texture, NULL, dc->screen->pixels, dc->screen->pitch);
+    SDL_RenderClear(dc->renderer);
+    SDL_RenderCopy(dc->renderer, dc->texture, NULL, NULL);
+    SDL_RenderPresent(dc->renderer);
 }
 
 void pan_image(DispContext *dc, int dx, int dy)
@@ -305,24 +316,68 @@ static void set_caption(DispContext *dc, char **argv,
     char buf[1024];
     const char *filename;
     filename = argv[image_index];
-    snprintf(buf, sizeof(buf), "bpgview [%d of %d] - %s",
-             image_index + 1, image_count, filename);
-    SDL_WM_SetCaption(buf, buf);
+    snprintf(buf, sizeof(buf), "bpgview [%d of %d] - %s", image_index + 1,
+             image_count, filename);
+    SDL_SetWindowTitle(dc->window, buf);
 }
 
 static void open_window(DispContext *dc, int w, int h, int is_full_screen)
 {
-    int flags;
+    uint32_t flags;
 
-    flags = SDL_DOUBLEBUF | SDL_HWSURFACE | SDL_HWACCEL;
+    flags = SDL_WINDOW_ALLOW_HIGHDPI;
     if (is_full_screen)
-        flags |= SDL_FULLSCREEN;
+        flags |= SDL_WINDOW_FULLSCREEN;
     else
-        flags |= SDL_RESIZABLE;
+        flags |= SDL_WINDOW_RESIZABLE;
 
-    dc->screen = SDL_SetVideoMode(w, h, 32, flags);
+    if (dc->screen) {
+        SDL_FreeSurface(dc->screen);
+    }
+    if (dc->texture) {
+        SDL_DestroyTexture(dc->texture);
+    }
+
+    if (dc->renderer) {
+        SDL_DestroyRenderer(dc->renderer);
+    }
+    if (dc->window) {
+        SDL_DestroyWindow(dc->window);
+    }
+
+    dc->window = SDL_CreateWindow("bpgview",
+                                  SDL_WINDOWPOS_UNDEFINED,
+                                  SDL_WINDOWPOS_UNDEFINED,
+                                  w, h, flags);
+    if (!dc->window) {
+        fprintf(stderr, "Could not create window: %s\n", SDL_GetError());
+        exit(1);
+    }
+
+    flags = SDL_RENDERER_SOFTWARE;
+    dc->renderer = SDL_CreateRenderer(dc->window, -1, flags);
+    if (!dc->renderer) {
+        fprintf(stderr, "Could not create renderer: %s\n", SDL_GetError());
+        exit(1);
+    }
+
+    if (SDL_GetRendererInfo(dc->renderer, &dc->info) < 0) {
+        fprintf(stderr, "Could not get renderer info: %s\n", SDL_GetError());
+        exit(1);
+    }
+
+    dc->screen = SDL_CreateRGBSurface(0, w, h, 32,
+                                      0x00FF0000, 0x0000FF00,
+                                      0x000000FF, 0xFF000000);
     if (!dc->screen) {
-        fprintf(stderr, "Could not init screen\n");
+        fprintf(stderr, "Could not create screen: %s\n", SDL_GetError());
+        exit(1);
+    }
+
+    dc->texture = SDL_CreateTexture(dc->renderer, SDL_PIXELFORMAT_ARGB8888,
+                                    SDL_TEXTUREACCESS_STREAMING, w, h);
+    if (!dc->texture) {
+        fprintf(stderr, "Could not create texture: %s\n", SDL_GetError());
         exit(1);
     }
 }
@@ -374,7 +429,8 @@ int main(int argc, char **argv)
     int c, image_index, image_count, incr, i;
     SDL_Event event;
     DispContext dc_s, *dc = &dc_s;
-    const SDL_VideoInfo *vi;
+    int num_displays = 0;
+    SDL_DisplayMode dm;
 
     for(;;) {
         c = getopt(argc, argv, "h");
@@ -394,14 +450,24 @@ int main(int argc, char **argv)
         goto show_help;
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) {
-        fprintf(stderr, "Could not init SDL\n");
+        fprintf(stderr, "Could not init SDL: %s\n", SDL_GetError());
         exit(1);
     }
     memset(dc, 0, sizeof(*dc));
 
-    vi = SDL_GetVideoInfo();
-    dc->screen_w = vi->current_w;
-    dc->screen_h = vi->current_h;
+    num_displays = SDL_GetNumVideoDisplays();
+    if (num_displays < 0)
+    {
+        fprintf(stderr, "Could not enumerate display: %s\n", SDL_GetError());
+        exit(1);
+    }
+    if (SDL_GetCurrentDisplayMode(0, &dm) != 0)
+    {
+        fprintf(stderr, "Could not get display mode: %s\n", SDL_GetError());
+        exit(1);
+    }
+    dc->screen_w = dm.w;
+    dc->screen_h = dm.h;
     dc->is_full_screen = 0;
 
     image_count = argc - optind;
@@ -426,8 +492,6 @@ int main(int argc, char **argv)
 
     center_image(dc);
     draw_image(dc);
-
-    SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 
     for(;;) {
         if (!SDL_WaitEvent(&event))
@@ -499,11 +563,17 @@ int main(int argc, char **argv)
                 break;
             }
             break;
-        case SDL_VIDEORESIZE:
+        case SDL_WINDOWEVENT:
             {
-                open_window(dc, event.resize.w, event.resize.h, 0);
-                center_image(dc);
-                draw_image(dc);
+                switch (event.window.event) {
+                case SDL_WINDOWEVENT_RESIZED:
+                    open_window(dc, event.window.data1, event.window.data2, 0);
+                    center_image(dc);
+                    draw_image(dc);
+                    break;
+                default:
+                    break;
+                }
             }
             break;
         case SDL_QUIT:
@@ -535,8 +605,15 @@ int main(int argc, char **argv)
             break;
         }
     }
- done: 
 
+ done: 
     SDL_FreeSurface(dc->screen);
+    SDL_DestroyTexture(dc->texture);
+    SDL_DestroyRenderer(dc->renderer);
+    SDL_DestroyWindow(dc->window);
+
+    SDL_Quit();
+
     return 0;
 }
+
