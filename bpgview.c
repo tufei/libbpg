@@ -354,8 +354,8 @@ static void open_window(DispContext *dc, int w, int h, int is_full_screen)
         exit(1);
     }
 
-    flags = SDL_RENDERER_SOFTWARE;
-    dc->renderer = SDL_CreateRenderer(dc->window, -1, flags);
+    //flags = SDL_RENDERER_SOFTWARE;
+    dc->renderer = SDL_CreateRenderer(dc->window, -1, 0);
     if (!dc->renderer) {
         fprintf(stderr, "Could not create renderer: %s\n", SDL_GetError());
         exit(1);
@@ -556,6 +556,7 @@ int main(int argc, char **argv)
                 } else {
                     open_window(dc, dc->win_w, dc->win_h, 0);
                 }
+                set_caption(dc, argv + optind, image_index, image_count);
                 center_image(dc);
                 draw_image(dc);
                 break;
@@ -568,6 +569,7 @@ int main(int argc, char **argv)
                 switch (event.window.event) {
                 case SDL_WINDOWEVENT_RESIZED:
                     open_window(dc, event.window.data1, event.window.data2, 0);
+                    set_caption(dc, argv + optind, image_index, image_count);
                     center_image(dc);
                     draw_image(dc);
                     break;
