@@ -24,6 +24,8 @@
 #ifndef _BPG_H
 #define _BPG_H
 
+#define BPG_LIB_VERSION 0.9.8
+
 #include "bpg_decoder.h"
 #include "bpg_encoder.h"
 

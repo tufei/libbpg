@@ -25,13 +25,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-#include <getopt.h>
 #include <inttypes.h>
 #ifdef WIN32
+#include "getopt.h"
 #include <windows.h>
 #include <SDL.h>
 #include <SDL_image.h>
 #else
+#include </usr/include/getopt.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #endif
@@ -107,7 +108,7 @@ Frame *bpg_load(FILE *f, int *pframe_count, int *ploop_count)
         return NULL;
     if (fread(buf, 1, len, f) != len)
         return NULL;
-    
+
     frames = NULL;
     frame_count = 0;
 
@@ -135,7 +136,7 @@ Frame *bpg_load(FILE *f, int *pframe_count, int *ploop_count)
                                    rmask, gmask, bmask, amask);
         if (!img) 
             goto fail;
-    
+
         SDL_LockSurface(img);
         for(y = 0; y < bi->height; y++) {
             bpg_decoder_get_line(s, (uint8_t *)img->pixels + y * img->pitch);
@@ -214,7 +215,7 @@ int load_image(DispContext *dc, const char *filename)
         SDL_RemoveTimer(dc->frame_timer_id);
         dc->frame_timer_id = 0;
     }
-    
+
     dc->frame_count = frame_count;
     dc->frames = frames;
     dc->frame_index = 0;

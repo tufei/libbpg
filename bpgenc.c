@@ -26,7 +26,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
-#include <getopt.h>
+#ifdef _WIN32
+#include "getopt.h"
+#else
+#include </usr/include/getopt.h>
+#endif
 #include <math.h>
 #include <assert.h>
 
@@ -105,12 +109,12 @@ static void convert_init(ColorConvertState *s, int in_bit_depth,
         k_r = 0.299;
         k_b = 0.114;
         goto convert_ycc;
-        
+
     case BPG_CS_YCbCr_BT709:
         k_r = 0.2126; 
         k_b = 0.0722;
         goto convert_ycc;
-        
+
     case BPG_CS_YCbCr_BT2020:
         k_r = 0.2627;
         k_b = 0.0593;
@@ -124,7 +128,7 @@ static void convert_init(ColorConvertState *s, int in_bit_depth,
         rgb_to_ycc[6] = 0.5;
         rgb_to_ycc[7] = -0.5 * (1 - k_r - k_b) / (1 - k_r);
         rgb_to_ycc[8] = -0.5 * k_b / (1 - k_r);
-        
+
         for(i = 0; i < 3; i++)
             s->rgb_to_ycc[i] = lrint(rgb_to_ycc[i] * mult_y);
         for(i = 3; i < 9; i++)
@@ -403,7 +407,7 @@ static RGBConvertFunc *rgb_to_cs[2][BPG_CS_COUNT] = {
         rgb48_to_ycc,
     }
 };
-    
+
 /* val = 1.0 - val */
 static void gray_one_minus(ColorConvertState *s, PIXEL *y_ptr, int n)
 {
@@ -569,7 +573,6 @@ static void decimate2_h16(int16_t *dst, PIXEL *src, int n, PIXEL *src1,
         decimate2p0_simple16(dst, src1 + d, n, bit_depth);
     else
         decimate2p1_simple16(dst, src1 + d, n, bit_depth);
-        
 }
 
 static void decimate2_v(PIXEL *dst, int16_t **src, int pos, int n,
@@ -598,7 +601,7 @@ static void decimate2_v(PIXEL *dst, int16_t **src, int pos, int n,
     src4 = src[pos];
     pos = add_mod_int(pos, 1, DP1TAPS);
     src5 = src[pos];
-    
+
     shift = 21 - bit_depth;
     offset = 1 << (shift - 1);
     pixel_max = (1 << bit_depth) - 1;
@@ -619,7 +622,7 @@ static void decimate2_hv(uint8_t *dst, int dst_linesize,
     PIXEL *buf1;
     int16_t *buf2[DP1TAPS];
     int w2, pos, i, y, y1, y2;
-    
+
     w2 = (w + 1) / 2;
 
     buf1 = malloc(sizeof(PIXEL) * (w + 2 * DTAPS_MAX));
@@ -700,7 +703,7 @@ Image *image_alloc(int w, int h, BPGImageFormatEnum format, int has_alpha,
 
     img = malloc(sizeof(Image));
     memset(img, 0, sizeof(*img));
-    
+
     img->w = w;
     img->h = h;
     img->format = format;
@@ -721,7 +724,7 @@ Image *image_alloc(int w, int h, BPGImageFormatEnum format, int has_alpha,
         /* multiple of 16 pixels to add borders */
         w1 = (w1 + (W_PAD - 1)) & ~(W_PAD - 1);
         h1 = (h1 + (W_PAD - 1)) & ~(W_PAD - 1);
-        
+
         linesize = w1 << img->pixel_shift;
         img->data[i] = malloc(linesize * h1);
         img->linesize[i] = linesize;
@@ -811,7 +814,7 @@ void image_pad(Image *img, int cb_size)
         return;
     w1 = (img->w + cb_size - 1) & ~(cb_size - 1);
     h1 = (img->h + cb_size - 1) & ~(cb_size - 1);
-    
+
     if (img->format == BPG_FORMAT_GRAY)
         c_count = 1;
     else
@@ -932,28 +935,28 @@ Image *read_png(BPGMetaData **pmd,
     BPGImageFormatEnum format;
     ColorConvertState cvt_s, *cvt = &cvt_s;
     BPGMetaData *md, **plast_md, *first_md;
-    
+
     png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING,
                                      NULL, NULL, NULL);
     if (png_ptr == NULL) {
         return NULL;
     }
-    
+
     info_ptr = png_create_info_struct(png_ptr);
     if (info_ptr == NULL) {
        png_destroy_read_struct(&png_ptr, NULL, NULL);
        return NULL;
     }
-    
+
     if (setjmp(png_jmpbuf(png_ptr))) {
         png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
         return NULL;
     }
-    
+
     png_init_io(png_ptr, f);
-    
+
     png_read_info(png_ptr, info_ptr);
-    
+
     bit_depth   = png_get_bit_depth(png_ptr, info_ptr);
     color_type = png_get_color_type(png_ptr, info_ptr);
 
@@ -985,7 +988,7 @@ Image *read_png(BPGMetaData **pmd,
     } else {
         format = BPG_FORMAT_444;
     }
-    
+
     has_alpha = (color_type == PNG_COLOR_TYPE_GRAY_ALPHA ||
                  color_type == PNG_COLOR_TYPE_RGB_ALPHA);
 
@@ -1014,9 +1017,9 @@ Image *read_png(BPGMetaData **pmd,
     for (y = 0; y < img->h; y++) {
         rows[y] = malloc(linesize);
     }
-    
+
     png_read_image(png_ptr, rows);
-    
+
     convert_init(cvt, bit_depth, out_bit_depth, color_space, limited_range);
 
     if (format != BPG_FORMAT_GRAY) {
@@ -1025,7 +1028,7 @@ Image *read_png(BPGMetaData **pmd,
 
         idx = (bit_depth == 16);
         convert_func = rgb_to_cs[idx][color_space];
-        
+
         for (y = 0; y < img->h; y++) {
             convert_func(cvt, (PIXEL *)(img->data[0] + y * img->linesize[0]),
                          (PIXEL *)(img->data[1] + y * img->linesize[1]),
@@ -1067,9 +1070,9 @@ Image *read_png(BPGMetaData **pmd,
         free(rows[y]);
     }
     free(rows);
-        
+
     png_read_end(png_ptr, info_ptr);
-    
+
     /* get the ICC profile if present */
     first_md = NULL;
     plast_md = &first_md;
@@ -1078,7 +1081,7 @@ Image *read_png(BPGMetaData **pmd,
         int comp_type;
         png_bytep iccp_buf;
         png_uint_32 iccp_buf_len;
-        
+
         if (png_get_iCCP(png_ptr, info_ptr,
                          &name, &comp_type, &iccp_buf, &iccp_buf_len) == 
             PNG_INFO_iCCP) {
@@ -1092,7 +1095,7 @@ Image *read_png(BPGMetaData **pmd,
     }
 
     png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-    
+
     *pmd = first_md;
     return img;
 }
@@ -1106,7 +1109,7 @@ static BPGMetaData *jpeg_get_metadata(jpeg_saved_marker_ptr first_marker)
     BPGMetaData *md, **plast_md, *first_md;
     int has_exif, has_xmp, l, iccp_chunk_count, i;
     jpeg_saved_marker_ptr iccp_chunks[256];
-    
+
     iccp_chunk_count = 0;
     has_exif = 0;
     has_xmp = 0;
@@ -1213,12 +1216,12 @@ Image *read_jpeg(BPGMetaData **pmd, FILE *f,
     jpeg_save_markers(&cinfo, JPEG_APP0 + 2, 65535);
 
     jpeg_stdio_src(&cinfo, f);
-    
+
     jpeg_read_header(&cinfo, TRUE);
-    
+
     cinfo.raw_data_out = TRUE;
     cinfo.do_fancy_upsampling = TRUE;
-    
+
     w = cinfo.image_width;
     h = cinfo.image_height;
 
@@ -1328,7 +1331,7 @@ Image *read_jpeg(BPGMetaData **pmd, FILE *f,
         plane_idx[2] = 2;
     }
     plane_idx[3] = 3;
-        
+
     if (cinfo.raw_data_out) {
         JSAMPROW rows[4][16];
         JSAMPROW *plane_pointer[4];
@@ -1356,11 +1359,11 @@ Image *read_jpeg(BPGMetaData **pmd, FILE *f,
             }
             plane_pointer[c_idx] = rows[c_idx];
         }
-        
+
         while (cinfo.output_scanline < cinfo.output_height) {
             y = cinfo.output_scanline;
             jpeg_read_raw_data(&cinfo, plane_pointer, y_h);
-            
+
             for(c_idx = 0; c_idx < cinfo.num_components; c_idx++) {
                 if (c_idx == 1 || c_idx == 2) {
                     h1 = c_h;
@@ -1388,7 +1391,7 @@ Image *read_jpeg(BPGMetaData **pmd, FILE *f,
                 }
             }
         }
-    
+
         for(c_idx = 0; c_idx < cinfo.num_components; c_idx++) {
             if (c_idx == 1 || c_idx == 2) {
                 h1 = c_h;
@@ -1420,12 +1423,12 @@ Image *read_jpeg(BPGMetaData **pmd, FILE *f,
         }
         free(buf);
     }
-    
+
     first_md = jpeg_get_metadata(cinfo.marker_list);
 
  the_end:
     jpeg_finish_decompress(&cinfo);
-    
+
     jpeg_destroy_decompress(&cinfo);
     *pmd = first_md;
     return img;
@@ -1454,7 +1457,7 @@ Image *load_image(BPGMetaData **pmd, const char *infilename,
             is_png = 0;
         fseek(f, 0, SEEK_SET);
     }
-    
+
     if (is_png) {
         img = read_png(&md, f, color_space, bit_depth, limited_range,
                        premultiplied_alpha);
@@ -1547,7 +1550,7 @@ static int extract_nal(uint8_t **pnal_buf, int *pnal_len,
     else
         start = 4;
     len = end - start;
-    
+
     nal_buf = malloc(len);
     nal_len = 0;
     idx = start;
@@ -1573,7 +1576,7 @@ static void put_ue(uint8_t **pp, uint32_t v)
 {
     uint8_t *p = *pp;
     int i, j;
-    
+
     for(i = 1; i < 5; i++) {
         if (v < (1 << (7 * i)))
             break;
@@ -1848,12 +1851,12 @@ static int build_modified_sps(uint8_t **pout_buf, int *pout_buf_len,
         get_ue_golomb(gb); /* max_dec_pic_buffering */
         get_ue_golomb(gb); /* num_reorder_pics */
         get_ue_golomb(gb); /* max_latency_increase */
-        
+
         log2_min_cb_size = get_ue_golomb(gb) + 3;
         log2_diff_max_min_coding_block_size = get_ue_golomb(gb);
         log2_min_tb_size = get_ue_golomb(gb) + 2;
         log2_diff_max_min_transform_block_size = get_ue_golomb(gb);
-               
+
         max_transform_hierarchy_depth_inter = get_ue_golomb(gb);
         max_transform_hierarchy_depth_intra = get_ue_golomb(gb);
         if (max_transform_hierarchy_depth_inter != max_transform_hierarchy_depth_intra) {
@@ -1912,7 +1915,7 @@ static int build_modified_sps(uint8_t **pout_buf, int *pout_buf_len,
                     skip_bits(gb, 16); /* sar_den */ 
                 }
             }
-            
+
             overscan_info_present_flag = get_bits(gb, 1);
             if (overscan_info_present_flag) {
                 skip_bits(gb, 1); /* overscan_appropriate_flag */
@@ -1988,7 +1991,7 @@ static int build_modified_sps(uint8_t **pout_buf, int *pout_buf_len,
         /* build the modified SPS */
         msps_buf = malloc(nal_len + 32);
         memset(msps_buf, 0, nal_len + 16);
-        
+
         init_put_bits(pb, msps_buf);
         put_ue_golomb(pb, log2_min_cb_size - 3);
         put_ue_golomb(pb, log2_diff_max_min_coding_block_size);
@@ -2024,7 +2027,7 @@ static int build_modified_sps(uint8_t **pout_buf, int *pout_buf_len,
 
         memcpy(p, msps_buf, msps_buf_len);
         p += msps_buf_len;
-        
+
         out_buf_len = p - out_buf;
         free(msps_buf);
         free(nal_buf);
@@ -2072,9 +2075,9 @@ static int build_modified_hevc(uint8_t **pout_buf,
     uint8_t *msps;
     const uint8_t *nal_buf;
     int msps_len, cidx, aidx, is_alpha, nal_len, first_nal, start, l, frame_num;
-    
+
     dyn_buf_init(out_buf);
-    
+
     /* add alpha MSPS */
     aidx = 0; /* avoids warning */
     if (abuf) {
@@ -2087,7 +2090,7 @@ static int build_modified_hevc(uint8_t **pout_buf,
         out_buf->len += msps_len;
         free(msps);
     }
-    
+
     /* add color MSPS */
     cidx = build_modified_sps(&msps, &msps_len, cbuf, cbuf_len);
     if (cidx < 0)
@@ -2314,7 +2317,7 @@ static int bpg_encoder_encode_trailer(BPGEncoderContext *s,
         exit(1);
     }
     s->enc_ctx = NULL;
-    
+
     alpha_buf = NULL;
     alpha_buf_len = 0;
     if (s->alpha_enc_ctx) {
@@ -2325,7 +2328,7 @@ static int bpg_encoder_encode_trailer(BPGEncoderContext *s,
         }
         s->alpha_enc_ctx = NULL;
     }
-    
+
     hevc_buf = NULL;
     hevc_buf_len = build_modified_hevc(&hevc_buf, out_buf, out_buf_len,
                                        alpha_buf, alpha_buf_len,
@@ -2336,7 +2339,7 @@ static int bpg_encoder_encode_trailer(BPGEncoderContext *s,
     }
     free(out_buf);
     free(alpha_buf);
-    
+
     if (write_func(opaque, hevc_buf, hevc_buf_len) != hevc_buf_len) {
         fprintf(stderr, "Error while writing HEVC data\n");
         exit(1);
@@ -2392,7 +2395,7 @@ int bpg_encoder_encode(BPGEncoderContext *s, Image *img,
         img_alpha->pixel_shift = img->pixel_shift;
         img_alpha->data[0] = img->data[c_idx];
         img_alpha->linesize[0] = img->linesize[c_idx];
-        
+
         img->data[c_idx] = NULL;
         img->has_alpha = 0;
     } else {
@@ -2431,7 +2434,7 @@ int bpg_encoder_encode(BPGEncoderContext *s, Image *img,
         if (img_alpha)
             image_convert16to8(img_alpha);
     }
-        
+
     if (s->frame_count == 0) {
         memset(ep, 0, sizeof(*ep));
         ep->qp = p->qp;
@@ -2457,7 +2460,7 @@ int bpg_encoder_encode(BPGEncoderContext *s, Image *img,
             else
                 ep->qp = p->alpha_qp;
             ep->chroma_format = 0;
-            
+
             s->alpha_enc_ctx = s->encoder->open(ep);
             if (!s->alpha_enc_ctx) {
                 fprintf(stderr, "Error while opening alpha encoder\n");
@@ -2488,7 +2491,7 @@ int bpg_encoder_encode(BPGEncoderContext *s, Image *img,
             BPGMetaData *md1;
             int max_len;
             uint8_t *q;
-            
+
             max_len = 0;
             for(md1 = s->first_md; md1 != NULL; md1 = md1->next) {
                 max_len += md1->buf_len + 5 * 2;
@@ -2502,19 +2505,18 @@ int bpg_encoder_encode(BPGEncoderContext *s, Image *img,
                 q += md1->buf_len;
             }
             extension_buf_len = q - extension_buf;
-            
+
             bpg_md_free(s->first_md);
             s->first_md = NULL;
         }
-    
+
         {
             uint8_t img_header[128], *q;
             int v, has_alpha, has_extension, alpha2_flag, alpha1_flag, format;
-            
+
             has_alpha = (img_alpha != NULL);
             has_extension = (extension_buf_len > 0);
-            
-            
+
             if (has_alpha) {
                 if (img->has_w_plane) {
                     alpha1_flag = 0;
@@ -2527,7 +2529,7 @@ int bpg_encoder_encode(BPGEncoderContext *s, Image *img,
                 alpha1_flag = 0;
                 alpha2_flag = 0;
             }
-            
+
             q = img_header;
             *q++ = (IMAGE_HEADER_MAGIC >> 24) & 0xff;
             *q++ = (IMAGE_HEADER_MAGIC >> 16) & 0xff;
@@ -2548,14 +2550,14 @@ int bpg_encoder_encode(BPGEncoderContext *s, Image *img,
             *q++ = v;
             put_ue(&q, width);
             put_ue(&q, height);
-            
+
             put_ue(&q, 0); /* zero length means up to the end of the file */
             if (has_extension) {
                 put_ue(&q, extension_buf_len); /* extension data length */
             }
-            
+
             write_func(opaque, img_header, q - img_header);
-            
+
             if (has_extension) {
                 if (write_func(opaque, extension_buf, extension_buf_len) != extension_buf_len) {
                     fprintf(stderr, "Error while writing extension data\n");
@@ -2577,12 +2579,12 @@ int bpg_encoder_encode(BPGEncoderContext *s, Image *img,
     s->frame_duration_tab[s->frame_count] = s->frame_ticks;
 
     s->encoder->encode(s->enc_ctx, img);
-    
+
     if (img_alpha) {
         s->encoder->encode(s->alpha_enc_ctx, img_alpha);
         image_free(img_alpha);
     }
-    
+
     s->frame_count++;
 
     if (!p->animated)
@@ -2635,7 +2637,6 @@ static int get_filename_num(char *buf, int buf_size, const char *str, int n)
             }
             snprintf(q, buf + buf_size - q, "%0*u", l, n);
             q += strlen(q);
-            
         } else {
         add_char:
             if ((q - buf) < buf_size - 1)
@@ -2763,7 +2764,7 @@ int main(int argc, char **argv)
     limited_range = 0;
     premultiplied_alpha = 0;
     frame_delay_file = NULL;
-    
+
     for(;;) {
         c = getopt_long_only(argc, argv, "q:o:hf:c:vm:b:e:a", long_opts, &option_index);
         if (c == -1)
@@ -2982,10 +2983,10 @@ int main(int argc, char **argv)
                         frame_ticks = 1;
                 }
             }
-            
+
             if (p->verbose)
                 printf("Encoding '%s' ticks=%d\n", filename, frame_ticks);
-            
+
             if (keep_metadata && first_frame) {
                 bpg_encoder_set_extension_data(enc_ctx, md);
             } else {
@@ -3008,22 +3009,22 @@ int main(int argc, char **argv)
             fprintf(stderr, "Could not read '%s'\n", infilename);
             exit(1);
         }
-        
+
         if (!keep_metadata && md) {
             bpg_md_free(md);
             md = NULL;
         }
-        
+
         bpg_encoder_set_extension_data(enc_ctx, md);
-        
+
         bpg_encoder_encode(enc_ctx, img, my_write_func, f);
         image_free(img);
     }
 
     fclose(f);
-    
+
     bpg_encoder_close(enc_ctx);
-    
+
     bpg_encoder_param_free(p);
 
     return 0;
